@@ -17,6 +17,9 @@ http://gis.stackexchange.com/questions/119736/ggmap-create-circle-symbol-where-r
 
 It is possible to start from the beginning of the script downloading all files from NOAA (CHECK FOR ERRORS IN THE COORDINATES) or using the files that I have added here (tornados_10-16, and tornados_clean_10-16.csv). 
 
-More details and graphs on https://jpinzon.shinyapps.io/Tornado_US/
+More details and graphs on 
+
+https://blogrblog.wordpress.com/2016/10/13/tornados-and-r
+https://jpinzon.shinyapps.io/Tornado_US/
 
 Enjoy!!!
