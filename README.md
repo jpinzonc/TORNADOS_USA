@@ -15,8 +15,8 @@ https://mpiccirilli.github.io/
 https://github.com/mpiccirilli/USMassShootings 
 http://gis.stackexchange.com/questions/119736/ggmap-create-circle-symbol-where-radius-represents-distance-miles-or-km 
 
-It is possible to start from the beginning of the script downloading all files from NOAA (CHECK FOR ERRORS IN THE COORDINATES) or using the files that I have added here (tornados_3-16, and tornados_clean_3-16.csv). 
+It is possible to start from the beginning of the script downloading all files from NOAA (CHECK FOR ERRORS IN THE COORDINATES) or using the files that I have added here (tornados_10-16, and tornados_clean_10-16.csv). 
 
-If you think there is room for improvement, please provide your comments. 
+More details and graphs on 
 
 Enjoy!!!
