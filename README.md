@@ -20,6 +20,7 @@ It is possible to start from the beginning of the script downloading all files f
 More details and graphs on 
 
 https://blogrblog.wordpress.com/2016/10/13/tornados-and-r
+
 https://jpinzon.shinyapps.io/Tornado_US/
 
 Enjoy!!!
