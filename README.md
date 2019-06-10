@@ -1,3 +1,4 @@
+# TORNADOS IN THE USA
 In North Texas, part of daily life are the storms, specially TORNADOS.
 
 During Spring, these natural events become a conversation topic especially for those of us that did not grow around them. Since I move here, I have heard about tornados hitting "urban" areas more often than "rural" areas and how previous years had more, or less, of these spinning circles of wind. 
