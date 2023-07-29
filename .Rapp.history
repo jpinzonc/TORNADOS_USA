@@ -1,0 +1,389 @@
+# This script intends to provide data on storms happened close to a selected location#
+# R vesion 3.2.3 (2015-12-10)#
+# This libraries are needed:#
+library(XML)#
+library(R.utils)#
+library(plyr)#
+library(dplyr)#
+library(ggplot2)#
+library(rgdal)#
+library(rgeos)#
+library(data.table)#
+library(tidyr)#
+library(ggmap)#
+library(scales)#
+library(dismo) # this package masks some of dplyr functions.
+all_storms = read.csv('all_storms_3-16.csv')
+initial.dir<-getwd()
+all_storms = read.csv('all_storms_3-16.csv')
+tornados = read.csv('tornados_3-16.csv')
+tornados
+tornados[tornados$BEGIN_LON > -13 & tornados$BEGIN_LON < 0 & !is.na(tornados$BEGIN_LON),]
+tornados[tornados$BEGIN_LON > 0 & !is.na(tornados$BEGIN_LON),]
+tornados[tornados$BEGIN_LON > -13 & tornados$BEGIN_LON < 0 & !is.na(tornados$BEGIN_LON),]
+tornados_clean = tornados %>%dplyr::select(.id, YEAR, MONTH_NAME,BEGIN_DAY, BEGIN_YEARMONTH,
+BEGIN_TIME, STATE, CZ_NAME, TOR_F_SCALE, TOR_LENGTH, TOR_WIDTH,BEGIN_LAT,BEGIN_LON,END_LAT,END_LON,
+INJURIES_DIRECT, INJURIES_INDIRECT, DEATHS_DIRECT, DEATHS_INDIRECT, EVENT_ID)%>%mutate(BEGIN_LON = ifelse(BEGIN_LON < 0 & BEGIN_LON >-13 & !is.na(BEGIN_LON),
+END_LON, BEGIN_LON))%>%mutate(BEGIN_LON = ifelse(BEGIN_LON > 0, -BEGIN_LON, BEGIN_LON), END_LON=ifelse(END_LON>0, -END_LON,END_LON))
+tornados_clean[tornados_clean$BEGIN_LON < 0 & tornados_clean$BEGIN_LON > -13 & !is.na(tornados_clean$BEGIN_LON),]
+tornados_clean[tornados_clean$BEGIN_LON > 0 & !is.na(tornados_clean$BEGIN_LON),]
+tornados_clean = read.csv('tornados_clean_3-16.csv')
+cat("According to NOAA, there has been",nrow(tornados_clean)," tornados reported in the US since 1951")
+tor_Year = tornados_clean%>%group_by(YEAR)%>%summarise(total.count=n())
+tor_Year
+ave_tor= as.integer(tor_Year%>%summarise(average=mean(total.count, na.rm=T)))
+ave_tor
+cat("According to NOAA, there has been",nrow(tornados_clean)," tornados reported in the US since 1951. With an average of", ave_tor,"tornados per year.")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+
+ggtitle("Tornados in the US (1951-2015)") +
+xlab("YEAR") + ylab("No. of Tornados") +
+geom_hline(yintercept = ave_tor)
+geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+
+ggtitle("Tornados in the US (1951-2015)") +
+xlab("YEAR") + ylab("No. of Tornados") +
+geom_hline(yintercept = ave_tor, col ="blue")
+tornados_clean%>%group_by(TOR_F_SCALE)%>%summarise(total.count=n())
+year = 2015
+tornados_clean %>% filter(YEAR == year)%>% group_by(TOR_F_SCALE)%>%summarise(total.count=n())
+year = 2014
+tornados_clean %>% filter(YEAR == year)%>% group_by(TOR_F_SCALE)%>%summarise(total.count=n())
+tor_cols <- c("YEAR", "TOR_F_SCALE")
+col_com <- lapply(tor_cols, as.symbol)
+tor_scale = tornados_clean %>%group_by_(.dots=col_com) %>%summarise(n = n())
+tor_scale
+ggplot(tor_scale,aes(x = YEAR ,y = n)) +
+geom_bar(stat="identity", aes(fill = TOR_F_SCALE),position = "dodge") + guides(fill=FALSE)+
+xlab("") + ylab("No. of Tornados")
+year2="1965"
+tor_scale_year = tornados_clean%>%filter(YEAR==year2)%>%group_by_(.dots=col_com)%>%summarise(n=n())
+ggplot(tor_scale_year,aes(x = TOR_F_SCALE,y = n)) +
+geom_bar(stat="identity", aes(fill = TOR_F_SCALE),position = "dodge")+ guides(fill=FALSE) +
+xlab("") + ylab("No. of Tornados")
+tor_DT = tornados_clean %>% mutate(DEATHS = tornados_clean$DEATHS_DIRECT + tornados_clean$DEATHS_INDIRECT)
+tor_DT<-tor_DT%>%mutate(MONTH = substr(tor_DT$BEGIN_YEARMONTH, nchar(tor_DT$BEGIN_YEARMONTH)-1, nchar(tor_DT$BEGIN_YEARMONTH)))
+t1 = distinct(tor_DT%>%dplyr::select(STATE, YEAR, MONTH, MONTH_NAME, DEATHS, DEATHS_DIRECT, DEATHS_INDIRECT)%>%gather(DEATH_TYPE, value, DEATHS:DEATHS_INDIRECT))
+t1=t1%>% mutate(DECADE = ifelse(YEAR<=1959 & YEAR>=1950, 1950, ifelse(YEAR<=1969 & YEAR>=1960,1960,ifelse(YEAR<=1979 & YEAR>=1970,1970,ifelse(YEAR<=1989 & YEAR>=1980,1980,ifelse(YEAR<=1999 & YEAR>=1990,1990,ifelse(YEAR<=2009 & YEAR>=2000,2000, 2010)))))))
+s_deaths = t1[t1$DEATH_TYPE!="DEATHS",]%>%dplyr::select(DEATH_TYPE, DECADE, value)%>%group_by(DEATH_TYPE, DECADE)%>%summarise_each(funs(mean, sum, max, min))
+ggplot(s_deaths, aes(x=factor(DECADE), y=sum, fill = DEATH_TYPE )) +
+geom_bar(stat="identity") +
+ggtitle("Total number of deaths caused by \n TORNADOS in the USA per DECADE") +
+xlab("DECADE") + ylab("No. of DEATHS")
+ggplot(t1[t1$DEATH_TYPE!="DEATHS",], aes(x=factor(MONTH), y=value, fill = DEATH_TYPE )) +
+geom_bar(stat="identity") +
+facet_wrap(~DECADE) +
+ggtitle("Average monthly Tornado related \n deaths in the USA per decade") +
+xlab("Month") + ylab("No. of DEATHS")
+ggplot(s_month_deaths[s_month_deaths$DEATH_TYPE!="DEATHS",], aes(x=factor(MONTH), y=sum, fill = DEATH_TYPE )) +
+geom_bar(stat="identity") +
+ggtitle("Average monthly Tornado-related \n deaths in the USA") +
+xlab("Month") + ylab("No. of DEATHS")
+ggplot(s_month_deaths[s_month_deaths$DEATH_TYPE!="DEATHS",], aes(x=factor(MONTH), y=sum, fill = DEATH_TYPE )) +
+geom_bar(stat="identity") +
+ggtitle("Average monthly Tornado-related \n deaths in the USA") +
+xlab("Month") + ylab("No. of DEATHS")
+s_month_deaths = t1[t1$DEATH_TYPE!="DEATHS",]%>%dplyr::select(DEATH_TYPE, MONTH, value)%>%group_by(DEATH_TYPE, MONTH)%>%summarise_each(funs(mean, sum, max, min))
+ggplot(s_month_deaths[s_month_deaths$DEATH_TYPE!="DEATHS",], aes(x=factor(MONTH), y=sum, fill = DEATH_TYPE )) +
+geom_bar(stat="identity") +
+ggtitle("Average monthly Tornado-related \n deaths in the USA") +
+xlab("Month") + ylab("No. of DEATHS")
+# DEATHS PER STATE#
+s_state = t1[t1$DEATH_TYPE!="DEATHS",]%>%dplyr::select(DEATH_TYPE, STATE, value)%>%group_by(DEATH_TYPE, STATE)%>%summarise_each(funs(mean, sum, max, min))#
+# State(s) with maximum/minimum number of DIRECT_DEATHS:#
+#
+maxST_direct = as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==max(sum))%>%dplyr::select(STATE)%>%collect %>% .[["STATE"]])#
+maxNo_direct =unique(as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==max(sum))%>%dplyr::select(sum)%>%collect %>% .[["sum"]]))#
+#
+minST_direct = as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==min(sum))%>%dplyr::select(STATE)%>%collect %>% .[["STATE"]])#
+minNo_direct =unique(as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==min(sum))%>%dplyr::select(sum)%>%collect %>% .[["sum"]]))#
+#
+cat("The state(s) with higher mortalities (direct deaths) due to Tornados is/are",maxST, "with",maxNo,"deaths.")#
+cat("The state(s) with lower mortalities (direct deaths) due to Tornados is/are",minST_direct, "with",minNo_direct,"deaths.")#
+#
+# Montlhy average DEATHS caused by Tordados in the USA#
+ggplot(s_state[s_state$DEATH_TYPE!="DEATHS",], aes(x=factor(STATE), y=sum, fill = DEATH_TYPE )) + #
+  geom_bar(stat="identity") + #
+  ggtitle("Average monthly Tornado related \n deaths per State in the USA") +#
+  xlab("STATE") + ylab("No. of DEATHS")+#
+  coord_flip()#
+#
+# The same graph as above, but ordered by magnitude#
+ggplot(s_state[s_state$DEATH_TYPE!="DEATHS",], aes(x=reorder(STATE,sum), y=sum, fill = DEATH_TYPE )) + #
+  geom_bar(stat="identity") + #
+  ggtitle("Average monthly Tornado related \n deaths per State in the USA") +#
+  xlab("STATE") + ylab("No. of DEATHS")+#
+  coord_flip()#
+######################   CREATE MAPS LOCALIZING THE TORNADOS ####################################:#
+#
+# Upload the US MAP#
+getTheMap <- suppressMessages(get_map(location = 'united states', zoom = 4, source = 'google'))#
+#
+# Plot the location of tornados for a particular year (Change the year)#
+#
+# Select the data for the map#
+# Adjust the filter option at the end for another year:#
+mapDT_year <- distinct(tor_DT%>%dplyr::select(YEAR,BEGIN_LON, BEGIN_LAT, DEATHS)%>%filter(YEAR==2015))#
+#
+# Create a map with the tornados for that year#
+tor_one_year <- suppressMessages(ggmap(getTheMap) + #
+                          geom_point(aes(x=BEGIN_LON, y=BEGIN_LAT), #
+                                     data = mapDT_year,#
+                                     size= mapDT_year $DEATHS*5, # size is proportional to the number. Their scale can be changed here. #
+                                     colour="red", #
+                                     alpha=.5)+#
+                          ggtitle("Tornado related deaths in US (2015)")) # CHANGE YEAR HERE!!#
+tor_one_year#
+#
+# For all years. Noticed the change in the size value.#
+mapDT_All <- distinct(tor_DT%>%dplyr::select(YEAR,BEGIN_LON, BEGIN_LAT, DEATHS))#
+tornados_US_50 <- suppressMessages(ggmap(getTheMap) + #
+                                  geom_point(aes(x=BEGIN_LON, y=BEGIN_LAT),#
+                                             data = mapDT_All,#
+                                             size=mapDT_All$DEATHS*.1,#
+                                             colour="red",#
+                                             alpha=.5) +#
+                                  ggtitle("Tornado related deaths in the US 1950-2015"))#
+tornados_US_50#
+################# PLOT TORNADOS AND RELATED DEATHS ON MAP OF AN AREA OF INTEREST ###########
+# Isolating the coordinates for all tornados in the dataset#
+locationCoords = tor_DT%>%dplyr::select(originalPlace=X, lon=BEGIN_LON, lat=BEGIN_LAT)#
+head(tor_DT)#
+# Coordinates for the City of Interest#
+# Enter the name of the city or location#
+city_of_interest = "Tulsa, OK"#
+cityOI = mutate(suppressMessages(geocode(city_of_interest)), originalPlace = (city_of_interest[1]))#
+cityOI = cityOI%>%dplyr::select(originalPlace, lon=longitude, lat=latitude)#
+#
+# Sorting the locations closer to the city of interest (cityOI)#
+deg2rad <- function(deg) return(deg*pi/180)#
+gcd.slc <- function(long1, lat1, long2, lat2) {#
+  long1 <- deg2rad(long1)#
+  lat1 <- deg2rad(lat1)#
+  long2 <- deg2rad(long2)#
+  lat2 <- deg2rad(lat2)#
+  R <- 6371 # Earth mean radius [km]#
+  d <- acos(sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2) * cos(long2-long1)) * R#
+  d <- d*0.621371 #in miles#
+  return(d) # Distance in miles#
+}#
+#
+distance <- gcd.slc(cityOI$lon, cityOI$lat, locationCoords$lon, locationCoords$lat)#
+distance_matrix <- which( distance <= 75 ) # 75 miles from the center#
+Area_COI = rbind((filter(locationCoords, originalPlace %in% distance_matrix)),cityOI)#
+#
+############### PLOTING THE DATA ON A MAP ###################
+# Map of the area of interest#
+cityMap <- gmap(city_of_interest, zoom=8, scale = 2)#
+plot(cityMap)#
+#
+coordinates(cityOI) <- ~ lon + lat#
+projection(cityOI) <- "+init=epsg:4326"#
+centralLocation <- spTransform(cityOI, CRS = CRS(projection(cityMap)))#
+#
+mile2meter <- function(x) {  x * 1609.344 }#
+distLayer100<- rgeos::gBuffer(centralLocation, width = mile2meter(100))#
+distLayer50  <- rgeos::gBuffer(centralLocation, width = mile2meter(50))#
+distLayer25  <- rgeos::gBuffer(centralLocation, width = mile2meter(25))#
+#
+plot(distLayer25, col = alpha("red", .0), add = TRUE)#
+plot(distLayer50, col = alpha("red", .0), add = TRUE)#
+plot(distLayer100, col = alpha("red", .0), add = TRUE)#
+#
+# Tornado locations around city of interest#
+coordinates(Area_COI) <- ~ lon + lat#
+projection(Area_COI) <- "+init=epsg:4326"#
+tor_aroud_COI <- spTransform(Area_COI, CRS = CRS(projection(cityMap)))#
+points(tor_aroud_COI, cex = 1, pch = 20, col='blue')#
+#
+# Add the Tornado related deaths around city of interest#
+# Generate a list of locations with DEATHS in the defined area.#
+DT_COI = filter(tor_DT, X %in% distance_matrix, DEATHS >0)#
+#
+coordinates(DT_COI) <- ~ BEGIN_LON + BEGIN_LAT#
+projection(DT_COI) <- "+init=epsg:4326"#
+allIncidents2 <- spTransform(DT_COI, CRS = CRS(projection(cityMap))) # coordinate reference system (CRS) #
+points(allIncidents2, cex = 1, pch = 2, col='red')#
+#
+###### COMPARISON BETWEEN TWO CITIES #############
+locationCoords = tor_DT%>%dplyr::select(originalPlace=X, lon=BEGIN_LON, lat=BEGIN_LAT)#
+#
+# Coordinates for the City of Interest (Change the city as much as you can!)#
+yourcity = "GandPraire, TX"#
+yourcity1 = "Dallas, TX"#
+#
+# Enter the distance around the cities to search for Tornados#
+# This is the radius of a circle centered at the city#
+distance_from_city = 10#
+#
+# Getting the geographic coordinates for each city#
+your_city =  mutate(suppressMessages(geocode(yourcity)), originalPlace = (yourcity[1]))#
+your_city = your_city%>%dplyr::select(originalPlace, lon=longitude, lat=latitude)#
+your_city1 =  mutate(suppressMessages(geocode(yourcity1)), originalPlace = (yourcity1[1]))#
+your_city1 = your_city1%>%dplyr::select(originalPlace, lon=longitude, lat=latitude)#
+# Getting the events in a radios from your_city#
+deg2rad <- function(deg) return(deg*pi/180)#
+gcd.slc <- function(long1, lat1, long2, lat2) {#
+  long1 <- deg2rad(long1)#
+  lat1 <- deg2rad(lat1)#
+  long2 <- deg2rad(long2)#
+  lat2 <- deg2rad(lat2)#
+  R <- 6371 # Earth mean radius [km]#
+  d <- acos(sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2) * cos(long2-long1)) * R#
+  d <- d*0.621371 #in miles#
+  return(d) # Distance in miles#
+}#
+#
+# Creating a matrix with the locations araound the cities#
+dist <- gcd.slc(your_city$lon, your_city$lat, locationCoords$lon, locationCoords$lat)#
+#
+dist_to_city <- which( dist <= distance_from_city) #
+events_near_your_city = rbind((filter(locationCoords, originalPlace %in% dist_to_city)),your_city)#
+#
+events=tor_DT%>%filter(X %in% events_near_your_city$originalPlace)%>%dplyr::select(X,BEGIN_YEARMONTH, BEGIN_DAY, BEGIN_LAT, BEGIN_LON, DEATHS)#
+#
+n_e = nrow(events)#
+#
+dist1 <- gcd.slc(your_city1$lon, your_city1$lat, locationCoords$lon, locationCoords$lat)#
+#
+dist_to_city1 <- which( dist1 <= distance_from_city ) #
+#
+events_near_your_city1 = rbind((filter(locationCoords, originalPlace %in% dist_to_city1)),your_city1)#
+#
+events_1=tor_DT%>%filter(X %in% events_near_your_city1$originalPlace)%>%dplyr::select(X, BEGIN_YEARMONTH, BEGIN_DAY, BEGIN_LAT, BEGIN_LON, DEATHS)#
+#
+n_e1= nrow(events_1)#
+common_events = merge(x=events, y=events_1)#
+com_ev=nrow(common_events)#
+#
+# The result#
+cat("There were",n_e, "tornados", distance_from_city, "miles around", yourcity, "and", n_e1, "in", yourcity1,", Of these,",com_ev,"were common.")#
+# END!!!#
+# THERE ARE MANY OTHER THINGS THAT CAN BE DONE ---- ENJOY !!!!
+n_e1= nrow(events_1)
+tornados_US_50 <- suppressMessages(ggmap(getTheMap) + #
+                                  geom_point(aes(x=BEGIN_LON, y=BEGIN_LAT),#
+                                             data = mapDT_All,#
+                                             size=mapDT_All$DEATHS*.1,#
+                                             colour="red",#
+                                             alpha=.5) +#
+                                  ggtitle("Tornado-related deaths in the US 1950-2015"))#
+tornados_US_50
+ggplot(s_state[s_state$DEATH_TYPE!="DEATHS",], aes(x=reorder(STATE,sum), y=sum, fill = DEATH_TYPE )) + #
+  geom_bar(stat="identity") + #
+  ggtitle("Average monthly Tornado-related \n deaths per State in the USA") +#
+  xlab("STATE") + ylab("No. of DEATHS")+#
+  coord_flip()
+ggplot(s_state[s_state$DEATH_TYPE!="DEATHS",], aes(x=factor(STATE), y=sum, fill = DEATH_TYPE )) + #
+  geom_bar(stat="identity") + #
+  ggtitle("Average monthly Tornado-related \n deaths per State in the USA") +#
+  xlab("STATE") + ylab("No. of DEATHS")+#
+  coord_flip()
+cat("The state(s) with higher mortalities (direct deaths) due to Tornados is/are",maxST, "with",maxNo,"deaths.")
+maxST_direct = as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==max(sum))%>%dplyr::select(STATE)%>%collect %>% .[["STATE"]])
+maxNo_direct =unique(as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==max(sum))%>%dplyr::select(sum)%>%collect %>% .[["sum"]]))
+minST_direct = as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==min(sum))%>%dplyr::select(STATE)%>%collect %>% .[["STATE"]])
+minNo_direct =unique(as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==min(sum))%>%dplyr::select(sum)%>%collect %>% .[["sum"]]))
+cat("The state(s) with higher mortalities (direct deaths) due to Tornados is/are",maxST, "with",maxNo,"deaths.")
+maxST_direct
+cat("The state(s) with lower mortalities (direct deaths) due to Tornados is/are",minST_direct, "with",minNo_direct,"deaths.")
+cat("The state(s) with higher mortalities (direct deaths) due to Tornados is/are", maxST_direct, "with", maxNo_direct,"deaths.")
+ggplot(s_month_deaths[s_month_deaths$DEATH_TYPE!="DEATHS",], aes(x=factor(MONTH), y=sum, fill = DEATH_TYPE )) + #
+  geom_bar(stat="identity") + #
+  ggtitle("Average monthly Tornado-related \n deaths in the USA") +#
+  xlab("Month") + ylab("No. of DEATHS")
+s_state = t1[t1$DEATH_TYPE!="DEATHS",]%>%dplyr::select(DEATH_TYPE, STATE, value)%>%group_by(DEATH_TYPE, STATE)%>%summarise_each(funs(mean, sum, max, min))
+maxST_direct = as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==max(sum))%>%dplyr::select(STATE)%>%collect %>% .[["STATE"]])
+maxNo_direct =unique(as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==max(sum))%>%dplyr::select(sum)%>%collect %>% .[["sum"]]))
+minST_direct = as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==min(sum))%>%dplyr::select(STATE)%>%collect %>% .[["STATE"]])
+minNo_direct =unique(as.character(s_state%>%filter(DEATH_TYPE=="DEATHS_DIRECT")%>%filter(sum==min(sum))%>%dplyr::select(sum)%>%collect %>% .[["sum"]]))
+cat("The state(s) with higher mortalities (direct deaths) due to Tornados is/are", maxST_direct, "with", maxNo_direct,"deaths.")
+cat("The state(s) with lower mortalities (direct deaths) due to Tornados is/are",minST_direct, "with",minNo_direct,"deaths.")
+ggplot(s_state[s_state$DEATH_TYPE!="DEATHS",], aes(x=factor(STATE), y=sum, fill = DEATH_TYPE )) + #
+  geom_bar(stat="identity") + #
+  ggtitle("Average monthly Tornado-related \n deaths per State in the USA") +#
+  xlab("STATE") + ylab("No. of DEATHS")+#
+  coord_flip()
+ggplot(s_state[s_state$DEATH_TYPE!="DEATHS",], aes(x=reorder(STATE,sum), y=sum, fill = DEATH_TYPE )) + #
+  geom_bar(stat="identity") + #
+  ggtitle("Average monthly Tornado-related \n deaths per State in the USA") +#
+  xlab("STATE") + ylab("No. of DEATHS")+#
+  coord_flip()
+url <- c("http://www1.ncdc.noaa.gov/pub/data/swdi/stormevents/csvfiles/")
+site <- htmlParse(url)
+a_nodes <- getNodeSet(site,"//a")
+View(tornados)
+cat("According to NOAA, there has been",nrow(tornados_clean)," tornados reported in the US since 1951")
+tor_Year = tornados_clean%>%group_by(YEAR)%>%summarise(total.count=n())
+tor_Year
+as.data.table(tor_Year)
+as.dat.table(ave_tor)
+as.data.table(ave_tor)
+ave_tor
+cat("According to NOAA, there has been",nrow(tornados_clean)," tornados reported in the US since 1951. With an average of", ave_tor,"tornados per year.")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_continuous(breaks = c(1951, 1, 2015)+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_continuous(breaks = c(1951, 1, 2015))+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_continuous(breaks = c(1951, 0, 2015))+#
+  geom_hline(yintercept = ave_tor, col ="blue")#
+#
+# Calculate the total number of tornados per scale:
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_continuous(breaks = c(1951, 10, 2015))+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+
+ggtitle("Tornados in the US (1951-2015)") +
+xlab("YEAR") + ylab("No. of Tornados") +
+scale_x_discrete(breaks = c(1951, 0, 2015))+
+geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_discrete()+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+tor_Year
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_discrete(YEAR)+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_discrete(aes(YEAR))+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_discrete(tor_Year$YEAR)+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+scale_x_discrete(tor_Year$YEAR, labels= as.list(unique(tor_Year$YEAr))+
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_discrete(tor_Year$YEAR, labels= as.list(unique(tor_Year$Year))+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  scale_x_discrete(tor_Year$YEAR, labels= as.list(unique(tor_Year$Year)))+#
+  geom_hline(yintercept = ave_tor, col ="blue")
+ggplot(tor_Year, aes(YEAR, total.count)) + geom_line()+#
+  ggtitle("Tornados in the US (1951-2015)") +#
+  xlab("YEAR") + ylab("No. of Tornados") +#
+  geom_hline(yintercept = ave_tor, col ="blue")
